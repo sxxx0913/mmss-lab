@@ -92,3 +92,10 @@ L_encode  = 400 ms   (H.264 encode + LL-HLS segmenting)
 L_net     = 700 ms   (CDN delivery, the most variable part)
 L_player  = 300 ms   (client buffer + decode + render)
 Sum = 1500 ms
+## View to Stakeholder Mapping
+
+| View | Viewpoint | Stakeholder | Concern it addresses |
+|---|---|---|---|
+| Context | C4 level-1 / context | Remote viewer | Getting the stream without loss |
+| Component | Module decomposition | Platform administrator | Maintainability of subsystems |
+| Deployment | Deployment view | Event broadcaster | Low latency via edge placement |
