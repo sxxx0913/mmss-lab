@@ -1,0 +1,13 @@
+{
+  "name": "mmss-lab-qoe-tools",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Automated QoE measurement for Lab 2 (drives stream/player.html in Chrome over CDP)",
+  "scripts": {
+    "qoe": "node qoe_measure.mjs"
+  },
+  "dependencies": {
+    "puppeteer-core": "^25.16.0"
+  }
+}

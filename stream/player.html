@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sports Event Streaming Platform — HLS player with QoE measurement</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0f1216; color: #e7ebf0;
+         font: 14px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  header { padding: 18px 24px 6px; }
+  h1 { font-size: 17px; margin: 0 0 2px; font-weight: 600; letter-spacing: .2px; }
+  .sub { color: #8b96a5; font-size: 12px; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px;
+         padding: 14px 24px 28px; align-items: start; }
+  video { width: 100%; background: #000; border-radius: 10px; display: block; }
+  .bar { display: flex; gap: 10px; align-items: center; margin: 10px 0 0; flex-wrap: wrap; }
+  button { background: #2f6fed; color: #fff; border: 0; border-radius: 7px;
+           padding: 8px 18px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  button:disabled { background: #2a3340; color: #6d7887; cursor: default; }
+  button.ghost { background: #1b2129; color: #c3cbd6; font-weight: 500; }
+  input { background: #161b22; border: 1px solid #262e39; color: #e7ebf0;
+          border-radius: 7px; padding: 8px 10px; width: 130px; font-size: 13px; }
+  .card { background: #141a21; border: 1px solid #212a35; border-radius: 10px; padding: 14px 16px; }
+  .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .8px;
+             color: #8b96a5; margin: 0 0 10px; font-weight: 600; }
+  dl { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; margin: 0; }
+  dt { color: #96a1b0; } dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 5px 7px; border-bottom: 1px solid #1e2630; font-size: 12.5px; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: #8b96a5; font-weight: 500; }
+  #log { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; color: #9fb0c3;
+         max-height: 168px; overflow: auto; margin: 0; padding-left: 0; list-style: none; }
+  #log li { padding: 2px 0; border-bottom: 1px dashed #1b232c; }
+  .ok { color: #3ddc84; } .warn { color: #ffb020; } .bad { color: #ff5c5c; }
+  .hint { color: #6d7887; font-size: 11.5px; margin-top: 10px; }
+  pre { background: #0b0f14; border: 1px solid #1e2630; border-radius: 8px;
+        padding: 10px; font-size: 12px; overflow-x: auto; margin: 8px 0 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Sports Event Streaming Platform — adaptive playback</h1>
+  <div class="sub">Lab 2 · session 2 · hls.js 1.7 · QoE: startup, switches, stalls, stall ratio</div>
+</header>
+
+<main>
+  <section>
+    <video id="v" muted playsinline controls></video>
+    <div class="bar">
+      <button id="start">Start</button>
+      <input id="profile" placeholder="profile (P1/P2/P3)" value="">
+      <button id="copy" class="ghost">Copy CSV row</button>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>Measured rows (append to results/qoe.csv)</h2>
+      <table id="rows">
+        <thead><tr><th>profile</th><th>startup_s</th><th>switches</th><th>stalls</th><th>stall_s</th><th>avg_kbps</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <pre id="csv">profile,startup_s,switches,stalls,stall_s,avg_kbps</pre>
+    </div>
+  </section>
+
+  <aside style="display:grid; gap:14px">
+    <div class="card">
+      <h2>Live state</h2>
+      <dl>
+        <dt>Level</dt>          <dd id="s-level">—</dd>
+        <dt>Declared bitrate</dt><dd id="s-kbps">—</dd>
+        <dt>Buffer</dt>         <dd id="s-buffer">—</dd>
+        <dt>Position</dt>       <dd id="s-pos">—</dd>
+        <dt>Est. bandwidth</dt> <dd id="s-bw">—</dd>
+        <dt>Startup</dt>        <dd id="s-startup">—</dd>
+        <dt>Switches</dt>       <dd id="s-sw">0</dd>
+        <dt>Stalls</dt>         <dd id="s-st">0</dd>
+        <dt>Stall time</dt>     <dd id="s-stt">0.0 s</dd>
+        <dt>Avg bitrate</dt>    <dd id="s-avg">—</dd>
+      </dl>
+    </div>
+    <div class="card">
+      <h2>Level timeline</h2>
+      <ul id="log"></ul>
+    </div>
+    <div class="card">
+      <h2>How to measure</h2>
+      <div class="hint">
+        F12 → Network → tick <b>Disable cache</b> → Throttling → Add profile
+        (Download in kbit/s, Latency in ms). Select the profile, reload, type its
+        name, press Start and wait for the end of playback.
+      </div>
+    </div>
+  </aside>
+</main>
+
+<script src="./vendor/hls.min.js"></script>
+<script>
+/* ------------------------------------------------------------------ *
+ * QoE instrumentation
+ *   startup_s  — from loadSource() to the first `playing` event
+ *   switches   — LEVEL_SWITCHED events after the first level was chosen
+ *   stalls     — `waiting` events while playback is expected to progress
+ *   stall_s    — total time spent in the stalled state
+ *   avg_kbps   — time-weighted average of the declared level bitrates
+ * ------------------------------------------------------------------ */
+const qs = new URLSearchParams(location.search);
+const SRC = qs.get('src') || 'hls/master.m3u8';
+const AUTO = qs.get('auto') === '1';
+const START_LEVEL = qs.has('startlevel') ? Number(qs.get('startlevel')) : undefined;
+
+const v = document.getElementById('v');
+const $ = id => document.getElementById(id);
+
+let hls, tLoad = 0, tFirstPlay = 0, tLastSwitch = 0, tWaitStart = 0;
+let startup = 0, switches = 0, stalls = 0, stallTime = 0;
+let lastLevel = -1, weighted = 0, playedFrom = 0, finished = false;
+const timeline = [];
+
+const fmt = (n, d = 2) => Number(n).toFixed(d);
+
+function log(text, cls = '') {
+  const li = document.createElement('li');
+  const t = performance.now() / 1000;
+  li.innerHTML = `<span class="${cls}">${fmt(t, 1).padStart(6, ' ')}s</span>  ${text}`;
+  $('log').appendChild(li);
+  $('log').scrollTop = 1e6;
+  timeline.push({ t: +fmt(t, 2), text });
+}
+
+function reset() {
+  startup = switches = stalls = stallTime = weighted = 0;
+  lastLevel = -1; tFirstPlay = 0; tWaitStart = 0; finished = false;
+  playedFrom = 0; timeline.length = 0;
+  $('log').innerHTML = '';
+  ['s-level', 's-kbps', 's-buffer', 's-pos', 's-bw', 's-startup', 's-avg'].forEach(i => $(i).textContent = '—');
+  $('s-sw').textContent = '0'; $('s-st').textContent = '0'; $('s-stt').textContent = '0.0 s';
+}
+
+/* ---- level accounting --------------------------------------------- */
+function levelKbps(level) {
+  const d = hls && hls.levels && hls.levels[level];
+  return d ? d.bitrate / 1000 : 0;
+}
+
+function onLevel(level, why) {
+  const now = performance.now() / 1000;
+  if (lastLevel >= 0) {
+    weighted += levelKbps(lastLevel) * Math.max(0, now - tLastSwitch);
+    if (level !== lastLevel) switches++;
+  }
+  const changed = level !== lastLevel;
+  lastLevel = level;
+  tLastSwitch = now;
+  const d = hls.levels[level] || {};
+  $('s-level').textContent = d.height ? `${d.width}×${d.height}` : String(level);
+  $('s-kbps').textContent = d.bitrate ? `${Math.round(d.bitrate / 1000)} kbit/s` : '—';
+  $('s-sw').textContent = switches;
+  if (changed) log(`level → ${d.height ? d.width + '×' + d.height : level} ` +
+                   `(${Math.round((d.bitrate || 0) / 1000)} kbit/s) ${why ? '· ' + why : ''}`,
+                   level === 0 ? 'warn' : 'ok');
+}
+
+/* ---- stalls -------------------------------------------------------- */
+v.addEventListener('waiting', () => {
+  if (finished || v.ended) return;
+  if (!tFirstPlay) return;                       // the initial load is not a stall
+  if (tWaitStart) return;                        // already counted
+  tWaitStart = performance.now() / 1000;
+  stalls++;
+  $('s-st').textContent = stalls;
+  log('stall (buffer empty)', 'bad');
+});
+
+v.addEventListener('playing', () => {
+  const now = performance.now() / 1000;
+  if (!tFirstPlay) {
+    tFirstPlay = now;
+    startup = now - tLoad;
+    playedFrom = now;
+    tLastSwitch = now;
+    $('s-startup').textContent = `${fmt(startup)} s`;
+    log(`first frame visible · startup ${fmt(startup)} s`, 'ok');
+    return;
+  }
+  if (tWaitStart) {
+    stallTime += now - tWaitStart;
+    tWaitStart = 0;
+    $('s-stt').textContent = `${fmt(stallTime, 1)} s`;
+    log(`playback resumed after ${fmt(stallTime, 1)} s of stalls`, 'ok');
+  }
+});
+
+/* ---- end of playback ---------------------------------------------- */
+v.addEventListener('ended', finish);
+function finish() {
+  if (finished || !tFirstPlay) return;
+  finished = true;
+  const now = performance.now() / 1000;
+  if (tWaitStart) { stallTime += now - tWaitStart; tWaitStart = 0; }
+  weighted += levelKbps(lastLevel) * Math.max(0, now - tLastSwitch);
+  const span = Math.max(0.001, now - playedFrom);
+  const avg = Math.round(weighted / span);
+  $('s-avg').textContent = `${avg} kbit/s`;
+  $('s-stt').textContent = `${fmt(stallTime, 1)} s`;
+
+  const profile = $('profile').value.trim() || 'P?';
+  const row = { profile, startup_s: +fmt(startup), switches, stalls,
+                stall_s: +fmt(stallTime), avg_kbps: avg };
+  addRow(row);
+  window.__qoe = row;
+  window.__qoeDone = true;
+  log('playback finished', 'ok');
+  $('start').disabled = false;
+}
+
+function addRow(r) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${r.profile}</td><td>${r.startup_s}</td><td>${r.switches}</td>` +
+                 `<td>${r.stalls}</td><td>${r.stall_s}</td><td>${r.avg_kbps}</td>`;
+  $('rows').tBodies[0].appendChild(tr);
+  $('csv').textContent += `\n${r.profile},${r.startup_s},${r.switches},${r.stalls},${r.stall_s},${r.avg_kbps}`;
+}
+
+/* ---- start --------------------------------------------------------- */
+function start() {
+  reset();
+  $('start').disabled = true;
+  const cfg = { enableWorker: true, lowLatencyMode: false };
+  if (START_LEVEL !== undefined && !Number.isNaN(START_LEVEL)) cfg.startLevel = START_LEVEL;
+
+  if (hls) { hls.destroy(); hls = null; }
+  hls = new Hls(cfg);
+  window.__hls = hls;
+
+  hls.on(Hls.Events.MANIFEST_PARSED, () => {
+    log(`manifest parsed · ${hls.levels.length} levels: ` +
+        hls.levels.map(l => `${l.width}×${l.height}@${Math.round(l.bitrate / 1000)}`).join(', '));
+    v.play().catch(e => log('play() rejected: ' + e.message, 'bad'));
+  });
+  hls.on(Hls.Events.LEVEL_SWITCHED, (_e, data) => onLevel(data.level, 'abr'));
+  let fragLogged = 0;
+  hls.on(Hls.Events.FRAG_LOADING, (_e, data) => {
+    if (fragLogged++ > 2) return;                 // first three fragments only
+    const lv = hls.levels[data.frag.level] || {};
+    log(`frag #${data.frag.sn} requested at ${lv.width || '?'}×${lv.height || '?'} ` +
+        `(${Math.round((lv.bitrate || 0) / 1000)} kbit/s)`);
+  });
+  hls.on(Hls.Events.LEVEL_LOADED, (_e, data) => {
+    if (data.details && data.details.live === false && lastLevel < 0 && hls.autoLevelEnabled) {
+      onLevel(hls.currentLevel >= 0 ? hls.currentLevel : 0, 'initial');
+    }
+  });
+  hls.on(Hls.Events.ERROR, (_e, data) => {
+    if (data.fatal) log(`fatal: ${data.type}/${data.details}`, 'bad');
+  });
+
+  tLoad = performance.now() / 1000;
+  hls.loadSource(SRC);
+  hls.attachMedia(v);
+  log(`load ${SRC}${cfg.startLevel !== undefined ? ' · startLevel=' + cfg.startLevel : ''}`);
+}
+
+/* ---- UI loop ------------------------------------------------------- */
+setInterval(() => {
+  if (!v.duration) return;
+  const b = v.buffered.length ? v.buffered.end(v.buffered.length - 1) - v.currentTime : 0;
+  $('s-buffer').textContent = `${fmt(Math.max(0, b), 1)} s`;
+  $('s-pos').textContent = `${fmt(v.currentTime, 1)} / ${fmt(v.duration, 0)} s`;
+  if (hls && hls.bandwidthEstimate) $('s-bw').textContent = `${Math.round(hls.bandwidthEstimate / 1000)} kbit/s`;
+  if (v.ended && !finished) finish();
+}, 250);
+
+$('start').addEventListener('click', start);
+if (qs.get('profile')) $('profile').value = qs.get('profile');
+$('copy').addEventListener('click', () => {
+  const txt = $('csv').textContent.split('\n').slice(1).join('\n');
+  navigator.clipboard.writeText(txt);
+  $('copy').textContent = 'Copied';
+  setTimeout(() => $('copy').textContent = 'Copy CSV row', 1200);
+});
+
+/* ---- automation hook (tools/qoe_measure.mjs) ----------------------- */
+if (AUTO) {
+  window.__qoeDone = false;
+  if (!v.play) log('no MSE support', 'bad');
+  start();
+}
+window.__playerReady = true;
+</script>
+</body>
+</html>
