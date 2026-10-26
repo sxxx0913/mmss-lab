@@ -1,0 +1,19 @@
+# --- Lab 2: media never goes into the repository ---------------------------
+data/
+*.ts
+*.m4s
+*.mp4
+*.mkv
+*.mov
+
+# --- Python ---------------------------------------------------------------
+.venv/
+__pycache__/
+*.pyc
+
+# --- Node (QoE measurement harness) ---------------------------------------
+tools/node_modules/
+
+# --- OS / editor ----------------------------------------------------------
+.DS_Store
+Thumbs.db
