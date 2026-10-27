@@ -1,0 +1,20 @@
+graph TB
+  subgraph Edge[Edge node at venue]
+    C1[Cam capture]
+    E1[Encoder]
+    M1[Mixer]
+    P1[Packager / segmenter]
+  end
+  subgraph Cloud[Cloud region]
+    LBn[Load balancer]
+    CDNn[CDN edge]
+    ST[(Object storage)]
+    SEGn[(Segment store)]
+    DASH[Dashboard]
+  end
+  C1 --> M1 --> E1 --> P1 --> LBn --> CDNn
+  P1 --> SEGn
+  E1 --> ST
+  DASH --> E1
+  DASH --> P1
+  CLIENT[Viewer device] --> CDNn

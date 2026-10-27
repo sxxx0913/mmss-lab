@@ -19,10 +19,13 @@ The Sports Event Streaming Platform captures a live sports event from multiple c
 | Secondary camera | Cam B 1080p50 | video | RGB 24-bit | 1920 × 1080 × 50 × 24 bit | 2.49 Gbit/s (raw) | critical | 0% |
 | Commentary | Commentary booth | audio | PCM 48 kHz | 48000 × 16 bit | 0.77 Mbit/s | high | <1% |
 | Telemetry | Wearable sensors | numeric | JSON | ~20 msg/s × 200 B | 32 kbit/s | low | <5% |
-| Archive file | Encoder output | video+audio | H.264/AAC | ~9 MB per minute | 8 Mbit/s (compressed) | high | 0% (archive) |
+| Delivery segments | Packager | video | HLS / MPEG-TS | 3 rungs × 2 s | 3.0 / 1.33 / 0.59 Mbit/s | high | 0% (live) |
+| Archive file | Encoder output | video+audio | AV1/AAC | ~40 MB per minute | 5.3 Mbit/s (compressed) | high | 0% (archive) |
 **Data Volume Calculation:**
 - **Main camera uncompressed**: R = w × h × f × d = 1920 × 1080 × 50 × 24 bit = 2,488,320,000 bit/s ≈ **2.49 Gbit/s**
-- **Compressed (H.264, ~8 Mbit/s)**: A 90-minute event = 8 Mbit/s × 5400 s = 5.4 GB per camera; with 4 cameras = ~21.6 GB per event.
+- **Compressed (H.264, 8 Mbit/s)**: A 90-minute event = 8 Mbit/s × 5400 s = 5.4 GB per camera; with 4 cameras = ~21.6 GB per event.
+- **Compressed (AV1, 5.3 Mbit/s)**: the same event at equal measured quality = 5.3 Mbit/s × 5400 s ≈ 3.6 GB per camera, ~14.4 GB per event (ADR-0004).
+- **Delivery segments (three rungs)**: 3.0 + 1.33 + 0.59 = 4.92 Mbit/s per viewer-second across all rungs; one 2 s segment of the top rung is 750 kB, which is what bounds the startup time on a slow link (docs/qoe.md).
 ## Functional Requirements
 - **FR-01.** As an event broadcaster, I want to switch between camera feeds so that the viewer always sees the best angle.
 - *Acceptance:* A manual switch completes within 200 ms in 9 out of 10 cases.
@@ -57,5 +60,5 @@ The Sports Event Streaming Platform captures a live sports event from multiple c
 | View | Viewpoint | Stakeholder | Concern it addresses |
 |---|---|---|---|
 | Context | C4 level-1 / context | Remote viewer | Getting the stream without loss |
-| Component | Module decomposition | Platform administrator | Maintainability of subsystems |
+| Component | Module decomposition | Platform administrator | Maintainability of subsystems, including the packaging stage |
 | Deployment | Deployment view | Event broadcaster | Low latency via edge placement |

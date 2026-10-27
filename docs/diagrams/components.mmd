@@ -1,0 +1,15 @@
+graph LR
+  CAP[Capture / cameras] --> ENC[Encoder]
+  MIC[Commentary mic] --> MIX[AV Mixer]
+  MIX --> ENC
+  ENC --> PKG[Packager / segmenter]
+  PKG --> LB[Load balancer]
+  LB --> CDN[CDN delivery]
+  CDN --> PLAY[Player]
+  ENC --> ARCH[Archive writer]
+  ARCH --> OBJ[(Object storage)]
+  PKG --> SEG[(Segment store)]
+  SEG --> LB
+  CTRL[Controller / dashboard] --> ENC
+  CTRL --> PKG
+  CTRL --> LB
