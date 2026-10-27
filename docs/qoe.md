@@ -54,9 +54,7 @@ The prediction is written before the measurement. P3 sits deliberately just belo
 
 Stall ratio ρ = T<sub>stall</sub> / (T<sub>play</sub> + T<sub>stall</sub>) by formula (5), with T<sub>play</sub> = 60 s.
 
-The rung the player settled on is v0 on P1, v1 on P2, and mostly v2 on P3. P1 and P2 match the prediction exactly. On P3 the prediction was that no rung fits, and the next paragraph shows what the player does instead.
-
-P1 and P2 land on the predicted rung: the time-averaged bitrate is 3000 kbit/s (v0) and 1389 kbit/s (v1 at 1330). P3 does not. Its average of 711 kbit/s sits between v2 (590) and v1 (1330) because the player spends about 84 % of the session on v2 and 16 % on v1: once the buffer is full a segment arrives faster than it is consumed, the bandwidth estimate rises above 1330/0.7, the player moves up to 720p, the buffer drains within one segment, a stall follows and it drops back. The average therefore runs above the profile bandwidth and the difference is paid in stalls.
+The rung the player settled on is v0 on P1, v1 on P2 and mostly v2 on P3. The time-averaged bitrate is 3000 kbit/s on P1 and 1389 on P2, which is the predicted v1 at 1330. P3 averages 711 kbit/s, between v2 (590) and v1 (1330), because the player spends about 84 % of the session on v2 and 16 % on v1: once the buffer is full a segment arrives faster than it is consumed, the bandwidth estimate rises above 1330/0.7, the player moves up to 720p, the buffer drains within one segment, a stall follows and it drops back. The average therefore runs above the profile bandwidth and the difference is paid in stalls.
 
 ---
 
