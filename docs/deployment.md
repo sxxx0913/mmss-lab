@@ -27,7 +27,7 @@ docker compose -f smart/docker-compose.yml up -d --build
 docker compose -f smart/docker-compose.yml ps
 ```
 
-`smart/Dockerfile` builds the image from `python:3.13-slim`, installs `requirements.txt` and copies the four scripts; `data/` is a volume so the databases survive a restart of a container and stay out of the repository. The measurements below come from this deployment: five services `Up`, the limits above enforced by the container runtime, and `docker stats` sampled at every step of the load test into `results/docker_stats.csv`.
+`smart/Dockerfile` builds the image from `python:3.13-slim`, installs `requirements.txt` and copies the four scripts into `/app/smart`; `data/` is mounted from the host so the databases survive a restart of a container and stay out of the repository. The measurements below come from this deployment: five services `Up`, the limits above enforced by the container runtime, and `docker stats` sampled at every step of the load test into `results/docker_stats.csv`.
 
 ## Patterns
 
