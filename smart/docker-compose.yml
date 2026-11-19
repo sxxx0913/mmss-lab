@@ -10,7 +10,7 @@ name: mmss-lab3
 
 services:
   broker-edge:
-    image: eclipse-mosquitto:2
+    image: eclipse-mosquitto:2.1.4-alpine
     volumes:
       - ./broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - edge-broker-data:/mosquitto/data
@@ -20,7 +20,7 @@ services:
 
   sensors:
     build: .
-    command: ["python", "sensors.py"]
+    command: ["python", "smart/sensors.py"]
     environment:
       MQTT_HOST: broker-edge
       MQTT_PORT: "1883"
@@ -28,10 +28,10 @@ services:
       ROOM: pitch
       HZ: "${HZ:-3}"
       DURATION: "${DURATION:-0}"
-      DROP: "0"
-      DUP: "0"
-      LATE: "0"
-      BAD: "0"
+      DROP: "${DROP:-0}"
+      DUP: "${DUP:-0}"
+      LATE: "${LATE:-0}"
+      BAD: "${BAD:-0}"
     volumes:
       - ../data:/app/data
     depends_on: [broker-edge]
@@ -43,7 +43,7 @@ services:
 
   gateway:
     build: .
-    command: ["python", "gateway.py"]
+    command: ["python", "smart/gateway.py"]
     environment:
       EDGE_HOST: broker-edge
       EDGE_PORT: "1883"
@@ -57,11 +57,15 @@ services:
     depends_on: [broker-edge, broker-cloud]
     restart: on-failure
     networks: [edge, cloud]
-    cpus: 0.5
+    # One core, not half: at 0.5 CPU the gateway takes in about 645 messages/s,
+    # below the 822 that the 1000 kbit/s uplink can carry, so the queue forms in
+    # the broker instead of the outbox and the node never saturates its own link.
+    # With one core the ingest reaches 930 messages/s and the link is the limit.
+    cpus: 1.0
     mem_limit: 192m
 
   broker-cloud:
-    image: eclipse-mosquitto:2
+    image: eclipse-mosquitto:2.1.4-alpine
     volumes:
       - ./broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - cloud-broker-data:/mosquitto/data
@@ -69,7 +73,7 @@ services:
 
   collector:
     build: .
-    command: ["python", "collector.py"]
+    command: ["python", "smart/collector.py"]
     environment:
       MQTT_HOST: broker-cloud
       MQTT_PORT: "1883"

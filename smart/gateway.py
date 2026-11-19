@@ -42,6 +42,14 @@ SITE = os.getenv("SITE", "stadium")
 UPLINK_KBPS = float(os.getenv("UPLINK_KBPS", "1000"))
 BUFFER_MAX = int(os.getenv("BUFFER_MAX", "50000"))
 INFLIGHT = int(os.getenv("INFLIGHT", "40"))
+# One commit per record costs an fsync per record. On a local disk that is
+# affordable, on a bind mount of a Windows directory it caps the gateway at about
+# 600 records/s, which is below the uplink and would be measured instead of the
+# architecture. The outbox therefore commits in batches: the durability window is
+# the batch, and the ADR already accepts the same window for the last transaction
+# after a power loss.
+COMMIT_EVERY = int(os.getenv("COMMIT_EVERY", "50"))
+COMMIT_MS = float(os.getenv("COMMIT_MS", "20"))
 
 DATA = Path(os.getenv("DATA_DIR", Path(__file__).resolve().parents[1] / "data"))
 DB_PATH = Path(os.getenv("DB_PATH", DATA / "gateway.db"))
@@ -68,6 +76,8 @@ class Gateway:
         self.lock = threading.Lock()
 
         self.buffer = 0
+        self.pending = 0                       # inserts not yet committed
+        self.last_commit = time.monotonic()
         self.rx_edge = 0
         self.peak = 0
         self.dropped = 0
@@ -103,7 +113,12 @@ class Gateway:
 
     # ------------------------------------------------------------------ edge
     def on_edge_connect(self, client, userdata, flags, reason_code, properties):
-        client.subscribe(f"{SITE}/+/+/tele", qos=1)
+        # QoS 0 on the edge hop, QoS 1 on the uplink. The edge hop is the one the
+        # sensors already publish to at QoS 0, and a reading lost there is visible
+        # as a gap in the sequence rather than as a broken guarantee. Acknowledging
+        # every record twice costs a PUBACK per record and, on the room node, about
+        # half of the rate at which the gateway can take records in.
+        client.subscribe(f"{SITE}/+/+/tele", qos=0)
         print(f"edge connected, subscribed to {SITE}/+/+/tele", flush=True)
 
     def on_edge_message(self, client, userdata, message):
@@ -121,7 +136,7 @@ class Gateway:
                 "INSERT INTO outbox (topic, payload, ts_ms) VALUES (?,?,?)",
                 (message.topic, bytes(message.payload), now),
             )
-            self.db.commit()
+            self.pending += 1
             self.buffer += 1
             self.rx_edge += 1
             self.peak = max(self.peak, self.buffer)
@@ -132,7 +147,14 @@ class Gateway:
                     (excess,),
                 )
                 self.db.commit()
+                self.pending = 0
+                self.last_commit = time.monotonic()
                 self.buffer -= excess
+            elif (self.pending >= COMMIT_EVERY
+                  or (time.monotonic() - self.last_commit) * 1000.0 >= COMMIT_MS):
+                self.db.commit()
+                self.pending = 0
+                self.last_commit = time.monotonic()
         self.wake.set()
 
     # ----------------------------------------------------------------- cloud
@@ -220,6 +242,8 @@ class Gateway:
         with self.lock:
             self.db.executemany("DELETE FROM outbox WHERE id = ?", [(i,) for i in ids])
             self.db.commit()
+            self.pending = 0
+            self.last_commit = time.monotonic()
             self.buffer -= len(ids)
             self.acked += len(ids)
 

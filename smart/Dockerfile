@@ -6,13 +6,18 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# The scripts keep the layout of the repository: smart/<script>.py. They locate
+# the data directory as parents[1]/data, which is /app/data here and the data/
+# directory of the repository on the host. Copying them straight to /app would
+# make that expression resolve to /data, outside the mounted volume.
+COPY requirements.txt ./smart/requirements.txt
+RUN pip install --no-cache-dir -r smart/requirements.txt
 
-COPY sensors.py collector.py gateway.py stats.py ./
+COPY sensors.py collector.py gateway.py stats.py ./smart/
 
-# data/ is mounted as a volume: the databases and the boot counter live there
+# data/ is a volume: the databases and the boot counter survive a restart of a
+# container and stay out of the repository
 RUN mkdir -p /app/data
 VOLUME ["/app/data"]
 
-CMD ["python", "sensors.py"]
+CMD ["python", "smart/sensors.py"]

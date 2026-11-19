@@ -83,40 +83,37 @@ node tools/qoe_measure.mjs --profiles P1:8000:40 --drop-after 12 --drop-to P3
 
 ## Lab 3, how to reproduce
 
-Eclipse Mosquitto 2, Python 3 with `paho-mqtt` and `matplotlib`, SQLite, Docker and Docker Compose (optional, for the container deployment).
+Eclipse Mosquitto 2.1.4, Python 3.13 with `paho-mqtt` and `matplotlib`, SQLite, Docker and Docker Compose.
 
 ```bash
-# 1. the channel: one broker and the subscriber, then the emulator with faults
-python smart/run_native.py clean
-python smart/collector.py &            # needs a broker on 127.0.0.1:1883
-MQTT_PORT=1883 HZ=20 DURATION=30 DROP=0.02 DUP=0.01 LATE=0.01 BAD=0.01 \
-    python smart/sensors.py
-python smart/stats.py                  # rate, loss ratio, gaps, duplicates, latency
-
-# 2. the container deployment (the file of record)
+# 1. the deployment of record: five services, two networks, the edge limits
 docker compose -f smart/docker-compose.yml up -d --build
 docker compose -f smart/docker-compose.yml ps
 
-# 3. without Docker: the same five processes
-python smart/run_native.py up
-python smart/run_native.py break       # the server component disappears
-python smart/run_native.py restore
-python smart/run_native.py stop
+# 2. the channel check: the emulator with four kinds of injected fault
+DROP=0.02 DUP=0.01 LATE=0.01 BAD=0.01 HZ=20 DURATION=30 \
+    docker compose -f smart/docker-compose.yml run --rm --no-deps sensors
+python smart/stats.py                  # rate, loss ratio, gaps, duplicates, latency
 
-# 4. the load test and the chart (~9 min)
+# 3. the break: the gateway leaves the cloud network and comes back
+python smart/break_test.py             # ~2 min, writes data/break.json
+
+# 4. the load test and the chart (~12 min, samples docker stats per step)
 ./smart/loadtest.sh
 ```
+
+`smart/run_native.py` starts the same five processes without Docker, for a machine that has no daemon; it is a fallback and not the deployment the numbers come from.
 
 ## Lab 3 results
 
 | | |
 |---|---|
-| Message schema | `dev`, `boot`, `seq`, `ts`, `qty`, `val`, `unit`; 110 bytes of payload |
-| Channel check, 1800 readings with 2 % / 1 % / 1 % / 1 % faults | 1800 sent, 1746 stored, loss ratio 0.030, 14 duplicates, 11 out of order, 17 rejected |
-| Link break, 60 s at 300 messages/s | buffer 18 180 records, drained in 35 s, 34 500 sent and 34 500 stored, loss 0 |
-| Throughput of the chain | Θ ≈ 845 messages/s, set by the 1000 kbit/s uplink of the gateway |
-| Latency below Θ | 0.9 to 1.2 ms mean, 2 ms at the 95th percentile |
-| Loss above Θ | 0.5 % at 1200 messages/s, 19.8 % at 1500 |
+| Message schema | `dev`, `boot`, `seq`, `ts`, `qty`, `val`, `unit`; 110 bytes of payload, 152 with topic and header |
+| Channel check, 1800 readings with 2 % / 1 % / 1 % / 1 % faults | 1800 sent, 1746 stored, loss ratio 0.030, 65 gaps, 14 duplicates, 11 out of order, 17 rejected |
+| Link break, 60 s at 300 messages/s | buffer 17 865 records, drained in 41 s, 33 840 sent and 33 840 stored, loss 0 |
+| Throughput of the chain | Θ ≈ 790 messages/s against 822 for the 1000 kbit/s uplink; the gateway at 50 % of its core |
+| Latency below Θ | 3 to 6 ms mean, 8 ms at the 95th percentile |
+| Loss above Θ | 15.0 % at 1350 messages/s, 40.9 % at 1500, dropped by the queue of the edge broker |
 
 ## Media licence
 

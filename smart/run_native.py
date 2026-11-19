@@ -47,7 +47,7 @@ def broker_conf(port: int) -> Path:
         if line.startswith("listener "):
             out.append(f"listener {port} 127.0.0.1")
             continue
-        if line.startswith("tcp_nodelay"):
+        if line.startswith(("tcp_nodelay", "set_tcp_nodelay")):
             continue            # added in Mosquitto 2.1, unknown to 2.0
         out.append(line.replace("/mosquitto/data/", str(DATA) + "/"))
     path = DATA / f"broker-{port}.conf"

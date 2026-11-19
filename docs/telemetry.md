@@ -69,7 +69,10 @@ The subscriber plays the role of the dead letter queue that MQTT does not define
 The emulator ran for 30 s at 20 readings per second from each of the three sensors, 1800 readings in total, with four kinds of injected fault: 2 % dropped, 1 % duplicated, 1 % late, 1 % corrupted.
 
 ```bash
-python smart/sensors.py            # HZ=20 DURATION=30 DROP=0.02 DUP=0.01 LATE=0.01 BAD=0.01
+# the broker, the gateway and the subscriber, then the emulator with the faults
+docker compose -f smart/docker-compose.yml up -d broker-edge broker-cloud gateway collector
+DROP=0.02 DUP=0.01 LATE=0.01 BAD=0.01 HZ=20 DURATION=30 \
+    docker compose -f smart/docker-compose.yml run --rm --no-deps sensors
 python smart/stats.py
 ```
 
@@ -82,12 +85,12 @@ python smart/stats.py
 
 ```
  boot   lambda    sent    recv    loss   gaps   dup   ooo   rej  mean ms   p95 ms   max ms
-    1     55.8    1800    1746    0.03     65    14    11    17     13.9      1.0   2964.0
+    1     55.8    1800    1746    0.03     65    14    11    17     18.8      8.0   2961.0
 ```
 
 The loss ratio of formula (2) is 1 − 1746/1800 = 0.030, which is exactly the 2 % of dropped readings plus the 1 % of rejected ones: a rejected reading is lost for the database even though the subscriber saw it. The 65 gaps are larger than the 37 dropped readings because a late reading is counted as a gap when the next number arrives and as out of order when it finally comes, and a rejected reading leaves a permanent hole in the sequence.
 
-The twelve late readings also explain the latency: the 95th percentile is 1.0 ms, while the mean of 13.9 ms is pulled up by the readings published up to three seconds after they were measured, and the largest value of 2964 ms is one of them. A run of 20 s without injected faults gives 1200 of 1200 readings, no gaps, and a mean latency of 0.42 ms with a maximum of 2 ms.
+The twelve late readings also explain the latency: the 95th percentile is 8 ms while the mean is 18.8 ms, because twelve readings of one to three seconds add about 14 ms to the mean and almost nothing to a percentile. A run of 20 s without injected faults gives 1200 of 1200 readings, no gaps, and a mean latency of 5.3 ms with a maximum of 15 ms. The median of the faulty run is 5 ms, so the hop itself does not change with the faults; what changes is the tail that the late readings create.
 
 The rejected messages, by reason:
 
