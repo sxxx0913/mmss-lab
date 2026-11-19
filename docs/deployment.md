@@ -82,7 +82,7 @@ The 15 s before `link=no` is the price of a silent cut. The interface disappears
 
 The drain follows (5) with one correction: `17 865/(822 − 300) ≈ 34 s`, but the measured drain is 41 s. The gateway is taking in 300 messages per second while it drains, and ingest and forward share one core, so the forward rate during the drain is 736 messages per second and not 822. The formula treats the two directions as independent, and on a node with one core they are not.
 
-## Load## Load
+## Load
 
 Twelve steps of 30 s, each on a clean volume, with the buffer reduced to 10 000 records. `results/load.csv` holds the rows, `results/docker_stats.csv` the resource use sampled during every step, `results/latency.png` the chart.
 
