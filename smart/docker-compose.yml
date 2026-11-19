@@ -1,0 +1,91 @@
+# Lab 3: the edge component in the room and the server component in the building.
+#
+#   edge network: sensors, edge broker, gateway
+#   cloud network: server broker, collector, gateway
+#
+# Only the gateway is attached to both networks, and only the edge broker
+# publishes a port, on 127.0.0.1, so the anonymous broker is not reachable from
+# the network of the host.
+name: mmss-lab3
+
+services:
+  broker-edge:
+    image: eclipse-mosquitto:2
+    volumes:
+      - ./broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - edge-broker-data:/mosquitto/data
+    ports:
+      - "127.0.0.1:1883:1883"
+    networks: [edge]
+
+  sensors:
+    build: .
+    command: ["python", "sensors.py"]
+    environment:
+      MQTT_HOST: broker-edge
+      MQTT_PORT: "1883"
+      SITE: stadium
+      ROOM: pitch
+      HZ: "${HZ:-3}"
+      DURATION: "${DURATION:-0}"
+      DROP: "0"
+      DUP: "0"
+      LATE: "0"
+      BAD: "0"
+    volumes:
+      - ../data:/app/data
+    depends_on: [broker-edge]
+    restart: on-failure
+    networks: [edge]
+    # the room node is a small device: half a core and 128 MB of memory
+    cpus: 0.5
+    mem_limit: 128m
+
+  gateway:
+    build: .
+    command: ["python", "gateway.py"]
+    environment:
+      EDGE_HOST: broker-edge
+      EDGE_PORT: "1883"
+      CLOUD_HOST: broker-cloud
+      CLOUD_PORT: "1883"
+      SITE: stadium
+      UPLINK_KBPS: "${UPLINK_KBPS:-1000}"
+      BUFFER_MAX: "${BUFFER_MAX:-50000}"
+    volumes:
+      - ../data:/app/data
+    depends_on: [broker-edge, broker-cloud]
+    restart: on-failure
+    networks: [edge, cloud]
+    cpus: 0.5
+    mem_limit: 192m
+
+  broker-cloud:
+    image: eclipse-mosquitto:2
+    volumes:
+      - ./broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - cloud-broker-data:/mosquitto/data
+    networks: [cloud]
+
+  collector:
+    build: .
+    command: ["python", "collector.py"]
+    environment:
+      MQTT_HOST: broker-cloud
+      MQTT_PORT: "1883"
+      SITE: stadium
+    volumes:
+      - ../data:/app/data
+    depends_on: [broker-cloud]
+    restart: on-failure
+    networks: [cloud]
+    cpus: 1.0
+    mem_limit: 256m
+
+networks:
+  edge:
+  cloud:
+
+volumes:
+  edge-broker-data:
+  cloud-broker-data:
