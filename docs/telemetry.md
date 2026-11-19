@@ -21,7 +21,7 @@ The state topic is retained, so a consumer that starts late learns the state of 
 
 ## Message schema
 
-One reading is one JSON object of 110 bytes, 140 bytes with its topic:
+One reading is one JSON object of 110 bytes, 152 bytes on the wire with its topic and the MQTT header:
 
 ```json
 {"dev":"ath07-pulse","boot":1,"seq":4182,"ts":"2026-11-19T08:41:20.123Z","qty":"pulse","val":142,"unit":"bpm"}
@@ -37,7 +37,7 @@ One reading is one JSON object of 110 bytes, 140 bytes with its topic:
 | `val` | number | bpm, m/s, m/s² | the reading itself | datasheet range, see below |
 | `unit` | string | `bpm`, `m/s`, `m/s2` | guards against a value without meaning | must belong to `qty` |
 
-Datasheet ranges: pulse 30 to 220 bpm, speed 0 to 12 m/s, acceleration −16 to 16 m/s². A value outside its range is rejected rather than stored, because a wearable that reports 900 bpm is broken and not merely inaccurate.
+Datasheet ranges: pulse 30 to 220 bpm, speed 0 to 12 m/s, acceleration −16 to 16 m/s². A value outside its range is rejected: a wearable that reports 900 bpm is broken.
 
 `boot` and `seq` together answer the question the protocol does not: MQTT with QoS 0 reports nothing about a lost message and with QoS 1 it may deliver the same message twice. The pair makes both visible, and `dev` separates the streams that share a topic tree.
 
@@ -59,7 +59,7 @@ Datasheet ranges: pulse 30 to 220 bpm, speed 0 to 12 m/s, acceleration −16 to 
 | a sensor disappears without disconnecting | the will of the broker | mark the device offline | `states`, state `offline` |
 | the link to the server breaks | the gateway loses its connection to the server broker | keep every record in the buffer, upload after the reconnect | `gateway.db`, `outbox` |
 | the buffer is full | record count above `BUFFER_MAX` | discard the oldest records, count them | gateway log and `data/gateway_stats.json` |
-| the clocks of two nodes disagree | assumed synchronised by NTP | not implemented; on one host the two timestamps come from the same clock | — |
+| the clocks of two nodes disagree | assumed synchronised by NTP | not implemented; on one host the two timestamps come from the same clock | none |
 | a reading arrives late but within the schema | latency above the threshold of the domain | not implemented as a separate action; it shows in the latency of `stats.py` and in `out_of_order` | `readings.latency_ms` |
 
 The subscriber plays the role of the dead letter queue that MQTT does not define: a rejected message is stored with its raw payload and its reason, so a fault in a sensor can be diagnosed after the fact instead of disappearing.
@@ -85,12 +85,12 @@ python smart/stats.py
 
 ```
  boot   lambda    sent    recv    loss   gaps   dup   ooo   rej  mean ms   p95 ms   max ms
-    1     55.8    1800    1746    0.03     65    14    11    17     18.8      8.0   2961.0
+    1     55.8    1800    1746    0.03     65    14    11    17     20.5     12.0   2965.0
 ```
 
 The loss ratio of formula (2) is 1 − 1746/1800 = 0.030, which is exactly the 2 % of dropped readings plus the 1 % of rejected ones: a rejected reading is lost for the database even though the subscriber saw it. The 65 gaps are larger than the 37 dropped readings because a late reading is counted as a gap when the next number arrives and as out of order when it finally comes, and a rejected reading leaves a permanent hole in the sequence.
 
-The twelve late readings also explain the latency: the 95th percentile is 8 ms while the mean is 18.8 ms, because twelve readings of one to three seconds add about 14 ms to the mean and almost nothing to a percentile. A run of 20 s without injected faults gives 1200 of 1200 readings, no gaps, and a mean latency of 5.3 ms with a maximum of 15 ms. The median of the faulty run is 5 ms, so the hop itself does not change with the faults; what changes is the tail that the late readings create.
+The twelve late readings also explain the latency: the 95th percentile is 12 ms while the mean is 20.5 ms, because twelve readings of one to three seconds add about 14 ms to the mean and almost nothing to a percentile. The median is 7 ms, close to the median of a run without faults, which gives 1200 of 1200 readings, no gaps, a mean of 6.4 ms and a maximum of 18 ms.
 
 The rejected messages, by reason:
 

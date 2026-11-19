@@ -17,7 +17,7 @@ npx @mermaid-js/mermaid-cli -i docs/diagrams/components.mmd \
 
 - `docs/requirements.md`: context, stakeholders, data register, FRs, NFRs
 - `docs/quality-scenarios.md`: two quality attribute scenarios
-- `docs/adr/`: four records, 0001 to 0003 from Lab 1 and 0004 from Lab 2
+- `docs/adr/`: six records, 0001 to 0003 from Lab 1, 0004 from Lab 2, 0005 and 0006 from Lab 3
 - `docs/pipeline.md`: Lab 2 session 1, source material, pipeline, H.264 against AV1
 - `docs/qoe.md`: Lab 2 session 2, ladder, network profiles, QoE, link to the architecture
 - `pipeline/pipeline.py`: decoding, transformation, encoding, measurement
@@ -27,7 +27,7 @@ npx @mermaid-js/mermaid-cli -i docs/diagrams/components.mmd \
 - `docs/telemetry.md`: Lab 3, the topics, the message schema, the error handling policy, the channel check
 - `docs/deployment.md`: Lab 3, the components, the patterns, the link break, the load, scalability, the stack
 - `smart/`: the sensor emulator, the subscriber, the gateway, the broker configuration, the compose file
-- `results/load.csv`, `results/latency.png`: the load test and its chart
+- `results/load.csv`, `results/docker_stats.csv`, `results/latency.png`: the load test, the resource use of every step and the chart
 
 ## Lab 2, how to reproduce
 
@@ -102,7 +102,7 @@ python smart/break_test.py             # ~2 min, writes data/break.json
 ./smart/loadtest.sh
 ```
 
-`smart/run_native.py` starts the same five processes without Docker, for a machine that has no daemon; it is a fallback and not the deployment the numbers come from.
+`smart/run_native.py` starts the same five processes without Docker, for a machine that has no daemon. The numbers in this repository come from the compose deployment.
 
 ## Lab 3 results
 
@@ -110,10 +110,10 @@ python smart/break_test.py             # ~2 min, writes data/break.json
 |---|---|
 | Message schema | `dev`, `boot`, `seq`, `ts`, `qty`, `val`, `unit`; 110 bytes of payload, 152 with topic and header |
 | Channel check, 1800 readings with 2 % / 1 % / 1 % / 1 % faults | 1800 sent, 1746 stored, loss ratio 0.030, 65 gaps, 14 duplicates, 11 out of order, 17 rejected |
-| Link break, 60 s at 300 messages/s | buffer 17 865 records, drained in 41 s, 33 840 sent and 33 840 stored, loss 0 |
-| Throughput of the chain | Θ ≈ 790 messages/s against 822 for the 1000 kbit/s uplink; the gateway at 50 % of its core |
-| Latency below Θ | 3 to 6 ms mean, 8 ms at the 95th percentile |
-| Loss above Θ | 15.0 % at 1350 messages/s, 40.9 % at 1500, dropped by the queue of the edge broker |
+| Link break, 60 s at 300 messages/s | buffer 17 835 records, drained in 38 s, 33 383 sent and 33 383 stored, loss 0 |
+| Throughput of the chain | Θ 760 to 844 messages/s, with 822 for the 1000 kbit/s uplink inside that band; the gateway at 50 % of its core |
+| Latency below Θ | 2.4 to 4.9 ms mean, 10 ms at the 95th percentile |
+| Loss above Θ | 12.4 % at 1200 messages/s, 40.3 % at 1350, 42.0 % at 1500, dropped by the queue of the edge broker |
 
 ## Media licence
 
