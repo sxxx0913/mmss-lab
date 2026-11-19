@@ -1,0 +1,2 @@
+paho-mqtt==2.1.0
+# matplotlib is needed by smart/plot.py, which runs on the host and not in the image
