@@ -108,12 +108,12 @@ python smart/break_test.py             # ~2 min, writes data/break.json
 
 | | |
 |---|---|
-| Message schema | `dev`, `boot`, `seq`, `ts`, `qty`, `val`, `unit`; 110 bytes of payload, 152 with topic and header |
+| Message schema | `dev`, `boot`, `seq`, `ts`, `qty`, `val`, `unit`; 110 bytes of payload, 152 charged to the uplink with topic and MQTT framing |
 | Channel check, 1800 readings with 2 % / 1 % / 1 % / 1 % faults | 1800 sent, 1746 stored, loss ratio 0.030, 65 gaps, 14 duplicates, 11 out of order, 17 rejected |
-| Link break, 60 s at 300 messages/s | buffer 17 835 records, drained in 38 s, 33 383 sent and 33 383 stored, loss 0 |
-| Throughput of the chain | Θ 760 to 844 messages/s, with 822 for the 1000 kbit/s uplink inside that band; the gateway at 50 % of its core |
-| Latency below Θ | 2.4 to 4.9 ms mean, 10 ms at the 95th percentile |
-| Loss above Θ | 12.4 % at 1200 messages/s, 40.3 % at 1350, 42.0 % at 1500, dropped by the queue of the edge broker |
+| Link break, 60 s at 300 messages/s | buffer 17 790 records, drained in 40 s, 34 005 sent and 34 005 stored, loss 0 |
+| Throughput of the chain | Θ ≈ 845 messages/s against 822 to 850 for the 1000 kbit/s uplink; the gateway at 50 % of its core |
+| Latency below Θ | 2.5 to 4.8 ms mean, 7 ms at the 95th percentile |
+| Loss above Θ | 0.8 % at 1200 messages/s, 16.8 % at 1350, 15.2 % at 1500; the outbox discards 304 and 2 043, the edge broker queue the rest |
 
 ## Media licence
 

@@ -1,6 +1,6 @@
 # Telemetry channel of the sports streaming platform
 
-The athlete wearables of the platform (Lab 1, domain 8) publish pulse, speed and acceleration to the broker of the edge node. The subscriber on the server validates every reading against the schema below and stores it in SQLite.
+The athlete wearables of the platform (Lab 1, domain 8) publish pulse, speed and acceleration to the broker of the edge node. The subscriber on the server validates every reading against the schema below and stores the valid ones in SQLite.
 
 ## Topics
 
@@ -15,13 +15,13 @@ A topic has four levels: site, zone, device and kind.
 
 The subscriber takes `stadium/+/+/tele` and `stadium/+/+/state`. The gateway takes the same wildcard on the edge broker and republishes everything to the server broker. A new consumer joins by subscribing to the wildcard, and nothing in the sensors changes.
 
-Telemetry goes out with QoS 0. A single reading of a wearable is worth less than the cost of a round trip, and a loss is recovered from the sequence number: the subscriber reports it as a gap and the platform keeps working with the readings it has. The state messages and the gateway use QoS 1, because a lost `online` or a lost record in the buffer is not recoverable from anything else.
+Telemetry goes out with QoS 0. A single reading of a wearable is worth less than the cost of a round trip, and a loss is recovered from the sequence number: the subscriber reports it as a gap and the platform keeps working with the readings it has. The state messages use QoS 1, and so does the gateway on the uplink to the server, because a lost `online` or a lost record in the buffer is not recoverable from anything else. On the edge hop the gateway subscribes at QoS 0, the level the sensors publish at: a reading lost there shows up as a gap in the sequence.
 
 The state topic is retained, so a consumer that starts late learns the state of every device at once. The will is published by the broker when a sensor disappears without a clean disconnect, which is what a crash of the emulator looks like from the broker.
 
 ## Message schema
 
-One reading is one JSON object of 110 bytes, 152 bytes on the wire with its topic and the MQTT header:
+One reading is one JSON object of 110 bytes. The gateway charges 152 bytes to the uplink for it: the payload, the 30 bytes of topic, and 12 for the MQTT framing.
 
 ```json
 {"dev":"ath07-pulse","boot":1,"seq":4182,"ts":"2026-11-19T08:41:20.123Z","qty":"pulse","val":142,"unit":"bpm"}
@@ -85,12 +85,12 @@ python smart/stats.py
 
 ```
  boot   lambda    sent    recv    loss   gaps   dup   ooo   rej  mean ms   p95 ms   max ms
-    1     55.8    1800    1746    0.03     65    14    11    17     20.5     12.0   2965.0
+    1     55.8    1800    1746    0.03     65    14    11    17     18.3      7.0   2960.0
 ```
 
 The loss ratio of formula (2) is 1 − 1746/1800 = 0.030, which is exactly the 2 % of dropped readings plus the 1 % of rejected ones: a rejected reading is lost for the database even though the subscriber saw it. The 65 gaps are larger than the 37 dropped readings because a late reading is counted as a gap when the next number arrives and as out of order when it finally comes, and a rejected reading leaves a permanent hole in the sequence.
 
-The twelve late readings also explain the latency: the 95th percentile is 12 ms while the mean is 20.5 ms, because twelve readings of one to three seconds add about 14 ms to the mean and almost nothing to a percentile. The median is 7 ms, close to the median of a run without faults, which gives 1200 of 1200 readings, no gaps, a mean of 6.4 ms and a maximum of 18 ms.
+The twelve late readings also explain the latency: the 95th percentile is 7 ms while the mean is 18.3 ms, because twelve readings of one to three seconds add about 14 ms to the mean and almost nothing to a percentile. The median is 5 ms, the same as the median of a run without faults, which gives 1200 of 1200 readings, no gaps, a mean of 5.4 ms and a maximum of 16 ms. Three runs of the check gave identical counts and a mean between 18 and 21 ms.
 
 The rejected messages, by reason:
 

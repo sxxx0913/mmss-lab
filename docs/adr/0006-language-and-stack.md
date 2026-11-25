@@ -14,7 +14,7 @@ The subscriber validates every message and writes it to a store that enforces th
 
 The broker implements the MQTT contract: topics, wildcards, retained messages, wills, QoS 1 with PUBACK, Keep Alive.
 
-The measurements that inform the decision: Θ between 760 and 844 messages/s for the whole channel with a 1000 kbit/s uplink, a delivery latency of 3 to 6 ms below that ceiling, 1 500 messages/s offered by the emulator in step 12 of the load test, the gateway at 50 % of its one-core quota at the ceiling, and its limit at the token bucket.
+The measurements that inform the decision: Θ between 814 and 848 messages/s for the whole channel with a 1000 kbit/s uplink, a delivery latency of 3 to 6 ms below that ceiling, 1 500 messages/s offered by the emulator in step 12 of the load test, the gateway at 50 % of its one-core quota at the ceiling, and its limit at the token bucket.
 
 ## Options
 
@@ -28,7 +28,7 @@ The measurements that inform the decision: Θ between 760 and 844 messages/s for
 
 ## Decision
 
-**Python 3.13 with `paho-mqtt` 2.1 and `sqlite3` for all three programs of the lab.** The gateway's critical path is a copy from the network into a SQLite outbox and a delete after the PUBACK; at 800 messages/s the two writes are 1 600 rows per second, which SQLite sustains with WAL and `synchronous=NORMAL` on one connection, committed in batches. The channel saturates at the uplink before the language matters: the load test holds 690 to 844 messages/s whether the offered load is 900 or 1 500, which is the signature of a limit outside the code, and `docker stats` shows the gateway at half of its core while that happens.
+**Python 3.13 with `paho-mqtt` 2.1 and `sqlite3` for all three programs of the lab.** The gateway's critical path is a copy from the network into a SQLite outbox and a delete after the PUBACK; at 845 messages/s the two writes are 1 690 rows per second, which SQLite sustains with WAL and `synchronous=NORMAL` on one connection, committed in batches. The channel saturates at the uplink before the language matters: the load test holds 814 to 848 messages/s whether the offered load is 900 or 1 500, while `docker stats` shows the gateway at half of its core.
 
 **SQLite for the buffer and the readings.** It gives the three properties the design needs without a server: a durable write before the send, a primary key that discards duplicates, and a query for the oldest records with an index. PostgreSQL would be the answer for many concurrent subscribers writing to one store, which is not the topology here (one subscriber per zone, ADR-0005).
 
@@ -38,9 +38,9 @@ The measurements that inform the decision: Θ between 760 and 844 messages/s for
 
 ## Consequences
 
-+ One toolchain, one image, one `requirements.txt`: the three programs share the client library and the database module, and a student can run the whole lab with `python`.
++ One toolchain, one image, one `requirements.txt`: the three programs share the client library and the database module, and the whole lab runs with `python`.
 + The gateway is 300 lines and its behaviour is visible in the report: the outbox table, the cursor, the token bucket and the PUBACK queue are ordinary code that a reader can follow.
-+ The measured ceiling of 760 to 844 messages/s is the uplink, which is the same ceiling a compiled gateway would have.
-− Python's global interpreter lock means the gateway's two connections and its sender share one core. At 800 messages/s that core is half used, so a gateway asked to do more per record (aggregation, filtering, a second protocol) would reach the core before it reaches the uplink. The measured headroom is what makes the decision revisitable.
++ The measured ceiling of 814 to 848 messages/s is the uplink, so the language of the gateway does not appear in it.
+− Python's global interpreter lock means the gateway's two connections and its sender share one core. At 845 messages/s that core is half used, so a gateway asked to do more per record (aggregation, filtering, a second protocol) would reach the core before it reaches the uplink. The measured headroom is what makes the decision revisitable.
 − The emulator's timing is Python timing: at 1 500 messages/s the scheduling jitter of `time.sleep` shows in the spacing of `ts`, and above the ceiling of the channel the emulator's outgoing queue holds readings that have been generated but not yet sent. The delivery latency is measured from `ts`, so a reading that waits in that queue counts as latency of the channel.
-− SQLite holds a write lock on the database file. A second writer on the same file (a second subscriber of the same zone) would serialise behind the first, which is why the scaling answer in `docs/deployment.md` partitions by zone and not by consumer.
+− SQLite holds a write lock on the database file. A second writer on the same file, a second subscriber of the same zone, would serialise behind the first, which is why the scaling answer in `docs/deployment.md` partitions by zone.
