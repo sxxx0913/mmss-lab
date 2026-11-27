@@ -4,17 +4,17 @@
 Accepted, 2026-11-19.
 
 ## Context
-The channel has five parts: the emulator, the edge broker, the gateway, the server broker and the subscriber (ADR-0005). Four of them are code or a broker, and each has a different constraint.
+The channel has five parts: the emulator, the edge broker, the gateway, the server broker and the subscriber (ADR-0005).
 
-The emulator runs on a workstation and has to produce up to 1 500 messages/s while remaining easy to change, because the value models of the sensors are the part of the lab that a student edits most.
+The emulator runs on a workstation and has to produce up to 1 500 messages/s while remaining easy to change, because the value models of the sensors are the part most often edited.
 
-The gateway is the only component that must survive a crash without losing a record, hold a queue on a disk, and speak two MQTT connections at once. It is also the component that the load test identified as the ceiling of the channel.
+The gateway is the only component that must survive a crash without losing a record, hold a queue on a disk, and speak two MQTT connections at once. It is also the component whose token bucket sets Θ.
 
-The subscriber validates every message and writes it to a store that enforces the key `(dev, boot, seq)`.
+The subscriber validates every message and writes the valid ones to a store that enforces the key `(dev, boot, seq)`.
 
 The broker implements the MQTT contract: topics, wildcards, retained messages, wills, QoS 1 with PUBACK, Keep Alive.
 
-The measurements that inform the decision: Θ between 814 and 848 messages/s for the whole channel with a 1000 kbit/s uplink, a delivery latency of 3 to 6 ms below that ceiling, 1 500 messages/s offered by the emulator in step 12 of the load test, the gateway at 50 % of its one-core quota at the ceiling, and its limit at the token bucket.
+The measurements that inform the decision: Θ between 814 and 848 messages/s for the whole channel with a 1000 kbit/s uplink, a delivery latency of 2.5 to 4.8 ms below that ceiling, 1 500 messages/s offered by the emulator in step 12 of the load test, the gateway at 50 % of its one-core quota at the ceiling, and its limit at the token bucket.
 
 ## Options
 

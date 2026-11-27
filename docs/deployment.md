@@ -62,7 +62,7 @@ stadium/pitch/ath07-speed/tele {"dev":"ath07-speed","boot":1,"seq":3,...,"val":1
 stadium/pitch/ath07-acc/tele   {"dev":"ath07-acc","boot":1,"seq":3,...,"val":2.376,"unit":"m/s2"}
 ```
 
-and the edge subscriber received the state of all three devices at once, from the retained messages, although it had not been running when they were published. The cost is that the publisher cannot know whether anyone is listening.
+The edge subscriber received the state of all three devices at once, from the retained messages, although it had not been running when they were published. The cost is that the publisher cannot know whether anyone is listening.
 
 ### Buffering at the edge
 
@@ -117,6 +117,8 @@ Twelve steps of 30 s, each on a clean volume, with the buffer reduced to 10 000 
 Up to 600 messages/s the latency stays between 2.5 and 4.8 ms. The utilization is below 0.75, the queue is empty, and the delivery latency is the two database writes of the gateway plus the hop. Step 7, at 17.7 ms, is the first sign that the queue is no longer empty.
 
 From step 8 on the received rate stays between 814 and 848 messages per second while the offered load rises from 900 to 1 500, and the latency climbs from 0.84 s to 8.0 s. The chain has reached its throughput Θ ≈ 845 messages per second, and the outbox fills: 1 553 records at step 8, 5 807 at step 9, and the configured cap of 10 000 at steps 10 and 12, where the counter reads 10 255 and 10 288 because records in flight are counted on both sides of the trim.
+
+The latency comes from the queue in front of the service. At step 9 the outbox peaks at 5 807 records, which at 845 messages per second is 6.9 s of backlog; the queue grows through the step, so the average reading waits about half of that, and the measured mean is 3.6 s.
 
 Above Θ the losses split between two points, and the gateway's counters say which. At step 10 the outbox reaches 10 255 records and discards 304 readings, which is exactly the 304 that the subscriber misses: 36 000 sent, 35 696 stored. At step 12 it discards 2 043. The rest of the loss, 6 170 readings at step 11 and 4 786 at step 12, never reached the gateway: the per-client queue of the edge broker holds 1 000 messages and drops what the node cannot take in while it is also forwarding at the link rate. The gateway's log prints `buffer` and `dropped` every second; those are the two columns `buffer_peak` and `dropped` of `results/load.csv`.
 

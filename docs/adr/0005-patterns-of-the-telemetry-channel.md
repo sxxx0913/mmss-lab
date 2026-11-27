@@ -4,13 +4,13 @@
 Accepted, 2026-11-19.
 
 ## Context
-The telemetry channel carries three wearable streams of one athlete from the room node to the database of the building server (Lab 3). Two forces shape the design.
+The telemetry channel carries three wearable streams of one athlete from the room node to the database of the building server (Lab 3).
 
 The number of consumers is not fixed. The subscriber that validates and stores readings is one consumer today; a dashboard, an alerting rule or a second building may join later, and the sensors must not be touched when that happens.
 
 The link between the room node and the server is a single network path, and a break is a normal mode of a distributed system. The platform must survive a break without losing readings, because a lost reading of a wearable is not recoverable from anything else: the device has no memory and QoS 0 reports nothing.
 
-The measurements that size both decisions are in `docs/deployment.md`: 300 messages/s of three channels, 152 bytes per record with the topic and the MQTT header, an uplink of 1000 kbit/s.
+The measurements that size both decisions are in `docs/deployment.md`: 300 messages/s of three channels, 152 bytes charged to the link per record, an uplink of 1000 kbit/s.
 
 ## Options
 

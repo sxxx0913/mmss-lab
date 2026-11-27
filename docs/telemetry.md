@@ -39,7 +39,7 @@ One reading is one JSON object of 110 bytes. The gateway charges 152 bytes to th
 
 Datasheet ranges: pulse 30 to 220 bpm, speed 0 to 12 m/s, acceleration −16 to 16 m/s². A value outside its range is rejected: a wearable that reports 900 bpm is broken.
 
-`boot` and `seq` together answer the question the protocol does not: MQTT with QoS 0 reports nothing about a lost message and with QoS 1 it may deliver the same message twice. The pair makes both visible, and `dev` separates the streams that share a topic tree.
+`boot` and `seq` together answer the question the protocol does not: MQTT with QoS 0 reports nothing about a lost message and with QoS 1 it may deliver the same message twice. The pair makes both visible. `boot` also keeps a restart from reading as a gap, since `seq` starts again at 0, and `dev` separates the streams that share a topic tree.
 
 ## Error handling policy
 
@@ -90,7 +90,7 @@ python smart/stats.py
 
 The loss ratio of formula (2) is 1 − 1746/1800 = 0.030, which is exactly the 2 % of dropped readings plus the 1 % of rejected ones: a rejected reading is lost for the database even though the subscriber saw it. The 65 gaps are larger than the 37 dropped readings because a late reading is counted as a gap when the next number arrives and as out of order when it finally comes, and a rejected reading leaves a permanent hole in the sequence.
 
-The twelve late readings also explain the latency: the 95th percentile is 7 ms while the mean is 18.3 ms, because twelve readings of one to three seconds add about 14 ms to the mean and almost nothing to a percentile. The median is 5 ms, the same as the median of a run without faults, which gives 1200 of 1200 readings, no gaps, a mean of 5.4 ms and a maximum of 16 ms. Three runs of the check gave identical counts and a mean between 18 and 21 ms.
+The twelve late readings also explain the latency: the 95th percentile is 7 ms while the mean is 18.3 ms, because twelve readings of one to three seconds add about 14 ms to the mean and almost nothing to a percentile. The median is 5 ms. A run of 20 s without injected faults gives 1200 of 1200 readings, no gaps, a mean of 5.4 ms and a maximum of 16 ms. Three runs of the check gave identical counts and a mean between 18 and 21 ms.
 
 The rejected messages, by reason:
 
